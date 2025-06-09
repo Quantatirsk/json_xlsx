@@ -149,6 +149,8 @@ CONVERTER_CONFIG = {
     'max_column_width': 100,      # 最大列宽
     'min_column_width': 14,       # 最小列宽
     'row_height_factor': 18,      # 行高系数
+    'header_background_color': '005BAC',  # 表头背景色
+    'header_font_color': 'FFFFFF',  # 表头字体颜色
 }
 ```
 
@@ -251,18 +253,9 @@ python examples/basic_usage.py
 
 ## 📈 更新日志
 
-### v0.0.7
+### v0.0.8
 
-* 首次发布
 * 支持嵌套JSON扁平化
 * 自动Excel格式化
-* 多工作表输出
 * 完整的测试覆盖
-
-## 🙏 致谢
-
-感谢所有为这个项目做出贡献的开发者！
-
----
-
-**json_xlsx** - 让JSON转Excel变得简单高效！ 🚀
+* 自定义标题行背景/字体颜色

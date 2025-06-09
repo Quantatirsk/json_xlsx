@@ -33,7 +33,7 @@ class ArrayFormatter:
                     if isinstance(v, (dict, list)):
                         v_str = json.dumps(v, ensure_ascii=False)
                         # 限制嵌套内容长度，避免过长
-                        if len(v_str) > 100:
+                        if len(v_str) > 20000:
                             v_str = v_str[:97] + "..."
                     else:
                         v_str = str(v)
