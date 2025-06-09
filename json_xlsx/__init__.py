@@ -10,7 +10,7 @@ JSON转Excel转换器 - 简单易用的Python库
     result = converter.convert(data, "output.xlsx")
 """
 
-__version__ = "0.0.2"
+__version__ = "0.0.7"
 __author__ = "Quant"
 __email__ = "pengzhia@gmail.com"
 __description__ = "Convert nested JSON data to formatted Excel files"

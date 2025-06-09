@@ -65,7 +65,7 @@ class ArrayFormatter:
             return ArrayFormatter.format_object_array(arr)
         else:
             # 简单类型数组，用逗号分隔
-            return ", ".join(str(item) for item in arr)
+            return "\n".join(str(item) for item in arr)
 
 
 class CellFormatter:

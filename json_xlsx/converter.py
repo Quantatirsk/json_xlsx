@@ -123,10 +123,73 @@ class JsonToExcelConverter:
             print(f"📊 数据处理完成，共处理 {len(flattened_data)} 条记录")
         return flattened_data
 
+    def _detect_numeric_columns(self, worksheet, threshold=0.7):
+        """
+        检测主要包含数字的列
+        
+        Args:
+            worksheet: openpyxl工作表对象
+            threshold: 数字比例阈值，默认70%以上为数字则认为是数字列
+        
+        Returns:
+            set: 数字列的列字母集合
+        """
+        numeric_columns = set()
+        
+        # 跳过标题行，从第2行开始检查
+        if worksheet.max_row <= 1:
+            return numeric_columns
+        
+        for col_idx in range(1, worksheet.max_column + 1):
+            column_letter = worksheet.cell(row=1, column=col_idx).column_letter
+            
+            # 收集该列的所有非空值
+            values = []
+            for row_idx in range(2, worksheet.max_row + 1):
+                cell_value = worksheet.cell(row=row_idx, column=col_idx).value
+                if cell_value is not None and str(cell_value).strip():
+                    values.append(str(cell_value).strip())
+            
+            if not values:
+                continue
+                
+            # 检查数字比例
+            numeric_count = 0
+            for value in values:
+                if self._is_numeric_value(value):
+                    numeric_count += 1
+            
+            # 如果数字比例超过阈值，标记为数字列
+            if len(values) > 0 and (numeric_count / len(values)) >= threshold:
+                numeric_columns.add(column_letter)
+        
+        return numeric_columns
+
+    def _is_numeric_value(self, value):
+        """
+        判断值是否为数字（包括整数、浮点数、百分比等）
+        
+        Args:
+            value: 要检查的值
+            
+        Returns:
+            bool: 是否为数字
+        """
+        try:
+            # 移除常见的非数字字符进行检查
+            cleaned_value = str(value).replace(',', '').replace('%', '').replace('$', '').replace('￥', '').strip()
+            
+            # 尝试转换为浮点数
+            float(cleaned_value)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+
     def _apply_excel_formatting(self, worksheet, is_original_sheet=False):
         """
-        应用Excel格式化
-
+        应用Excel格式化（修改版本，支持智能对齐）
+        
         Args:
             worksheet: openpyxl工作表对象
             is_original_sheet: 是否为原始数据表
@@ -135,17 +198,24 @@ class JsonToExcelConverter:
         if worksheet.max_row <= 1:
             return
 
-        # 设置标题行格式
-        header_font = Font(name="黑体", bold=False, color="FFFFFF")
-        header_fill = PatternFill(
-            start_color="366092", end_color="366092", fill_type="solid"
-        )
+        # 检测数字列
+        numeric_columns = self._detect_numeric_columns(worksheet)
+        sheet_type = "原始数据表" if is_original_sheet else "对比数据表"
+        print(f"🔢 {sheet_type}检测到数字列: {numeric_columns}")
 
+        # 设置标题行格式
+        header_font = Font(name="Microsoft YaHei", bold=True, color=self.config["header_font_color"])
+        header_fill = PatternFill(
+            start_color=self.config["header_background_color"], 
+            end_color=self.config["header_background_color"], 
+            fill_type="solid"
+        )
+        
         # 格式化标题行
         for cell in worksheet[1]:
             cell.font = header_font
             cell.fill = header_fill
-            cell.alignment = Alignment(vertical="center")
+            cell.alignment = Alignment(horizontal="center", vertical="center")  # 标题行居中
             cell.border = Border(
                 left=Side(style="thin"),
                 right=Side(style="thin"),
@@ -153,10 +223,23 @@ class JsonToExcelConverter:
                 bottom=Side(style="thin"),
             )
 
-        # 格式化所有行，设置垂直居中并添加黑色框线
+        # 格式化数据行，根据列类型设置水平对齐
         for row in worksheet.iter_rows(min_row=2):
             for cell in row:
-                cell.alignment = Alignment(vertical="center")
+                column_letter = cell.column_letter
+                
+                # 设置字体
+                cell.font = Font(name="Microsoft YaHei", bold=False)
+                
+                # 根据列类型设置对齐方式
+                if column_letter in numeric_columns:
+                    # 数字列：水平居中，垂直居中
+                    cell.alignment = Alignment(horizontal="center", vertical="center")
+                else:
+                    # 文本列：左对齐，垂直居中
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                
+                # 设置边框
                 cell.border = Border(
                     left=Side(style="thin", color="000000"),
                     right=Side(style="thin", color="000000"),
@@ -169,8 +252,8 @@ class JsonToExcelConverter:
             self._auto_adjust_columns(worksheet, is_original_sheet)
 
         if self.config["wrap_text"]:
-            self._apply_text_wrapping(worksheet)
-
+            self._apply_text_wrapping(worksheet, numeric_columns)
+            
     def _auto_adjust_columns(self, worksheet, is_original_sheet=False):
         """自动调整列宽"""
         for column in worksheet.columns:
@@ -216,20 +299,34 @@ class JsonToExcelConverter:
 
             worksheet.column_dimensions[column_letter].width = adjusted_width
 
-    def _apply_text_wrapping(self, worksheet):
-        """应用文本换行"""
+    def _apply_text_wrapping(self, worksheet, numeric_columns=None):
+        """
+        应用文本换行（修改版本，考虑对齐方式）
+        
+        Args:
+            worksheet: openpyxl工作表对象
+            numeric_columns: 数字列集合
+        """
+        if numeric_columns is None:
+            numeric_columns = set()
+        
         # 设置标题行高度为28.8
         worksheet.row_dimensions[1].height = 28.8
 
-        # 应用标题行的自动换行
+        # 应用标题行的自动换行（居中）
         for cell in worksheet[1]:
-            cell.alignment = Alignment(wrap_text=True, vertical="center")
+            cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
 
         for row in worksheet.iter_rows(min_row=2):
             max_lines = 1
             for cell in row:
-                # 设置自动换行
-                cell.alignment = Alignment(wrap_text=True, vertical="center")
+                column_letter = cell.column_letter
+                
+                # 根据列类型设置换行对齐
+                if column_letter in numeric_columns:
+                    cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+                else:
+                    cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
 
                 # 计算行高
                 if cell.value and "\n" in str(cell.value):

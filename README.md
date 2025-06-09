@@ -24,6 +24,37 @@ pip install json-xlsx
 
 ## 🚀 快速开始
 
+### 快速体验
+
+```python
+"""
+测试json_xlsx库
+"""
+
+import requests
+from json_xlsx import convert_json_to_excel
+
+# 获取响应数据
+response = requests.get("https://dummyjson.com/recipes", timeout=10)
+response_data = response.json()
+
+# 获取第一个key的值
+json_data = response_data.get(list(response_data.keys())[0])
+
+# 配置表头背景色和字体颜色
+CONFIG = {"header_background_color": "123456", "header_font_color": "FFFFFF"}
+
+# 输出路径
+OUTPUT_PATH = "sample.xlsx" 
+
+# 转换数据
+result = convert_json_to_excel(json_data, OUTPUT_PATH, CONFIG)
+
+# 打印输出路径
+print(result["output_path"])
+
+```
+
 ### 基本用法
 
 ```python
@@ -220,7 +251,7 @@ python examples/basic_usage.py
 
 ## 📈 更新日志
 
-### v0.0.2
+### v0.0.7
 
 * 首次发布
 * 支持嵌套JSON扁平化
