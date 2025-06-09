@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "json_xlsx"
-version = "0.0.9"
+version = "0.1.0"
 description = "Convert nested JSON data to formatted Excel files"
 readme = "README.md"
 license = "MIT"
