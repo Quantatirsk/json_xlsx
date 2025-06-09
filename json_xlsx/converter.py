@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 
-from .config import CONVERTER_CONFIG, SHEET_CONFIG, VALIDATION_CONFIG
+from .config import CONVERTER_CONFIG, VALIDATION_CONFIG
 from .formatters import CellFormatter
 
 
@@ -26,7 +26,6 @@ class JsonToExcelConverter:
         if config:
             self.config.update(config)
 
-        self.sheet_config = SHEET_CONFIG
         self.validation_config = VALIDATION_CONFIG
 
     def flatten_dict(
@@ -185,14 +184,90 @@ class JsonToExcelConverter:
         except (ValueError, TypeError):
             return False
 
+    def _auto_adjust_columns(self, worksheet):
+        """自动调整列宽"""
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
 
-    def _apply_excel_formatting(self, worksheet, is_original_sheet=False):
+            for cell in column:
+                try:
+                    cell_value = str(cell.value) if cell.value is not None else ""
+
+                    # 处理换行符
+                    if "\n" in cell_value:
+                        lines = cell_value.split("\n")
+                        max_line_length = (
+                            max(len(line) for line in lines) if lines else 0
+                        )
+                        max_length = max(max_length, max_line_length)
+                    else:
+                        max_length = max(max_length, len(cell_value))
+                except Exception:
+                    pass
+
+            # 根据列名长度设置最小列宽
+            header_length = len(
+                str(worksheet.cell(row=1, column=column[0].column).value or "")
+            )
+            adjusted_width = min(
+                max(
+                    max_length + 6,
+                    header_length + 4,
+                    self.config["min_column_width"],
+                ),
+                self.config["max_column_width"],
+            )
+
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+
+    def _apply_text_wrapping(self, worksheet, numeric_columns=None):
+        """
+        应用文本换行（修改版本，考虑对齐方式）
+        
+        Args:
+            worksheet: openpyxl工作表对象
+            numeric_columns: 数字列集合
+        """
+        if numeric_columns is None:
+            numeric_columns = set()
+        
+        # 设置标题行高度为28.8
+        worksheet.row_dimensions[1].height = 28.8
+
+        # 应用标题行的自动换行（居中）
+        for cell in worksheet[1]:
+            cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+
+        for row in worksheet.iter_rows(min_row=2):
+            max_lines = 1
+            for cell in row:
+                column_letter = cell.column_letter
+                
+                # 根据列类型设置换行对齐
+                if column_letter in numeric_columns:
+                    cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
+                else:
+                    cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
+
+                # 计算行高
+                if cell.value and "\n" in str(cell.value):
+                    lines_count = len(str(cell.value).split("\n"))
+                    max_lines = max(max_lines, lines_count)
+
+            # 设置行高
+            if max_lines > 1:
+                worksheet.row_dimensions[row[0].row].height = (
+                    max_lines * self.config["row_height_factor"]
+                )
+
+
+    def _apply_excel_formatting(self, worksheet):
         """
         应用Excel格式化（修改版本，支持智能对齐）
         
         Args:
             worksheet: openpyxl工作表对象
-            is_original_sheet: 是否为原始数据表
         """
         # 检查工作表是否有数据
         if worksheet.max_row <= 1:
@@ -200,8 +275,7 @@ class JsonToExcelConverter:
 
         # 检测数字列
         numeric_columns = self._detect_numeric_columns(worksheet)
-        sheet_type = "原始数据表" if is_original_sheet else "对比数据表"
-        print(f"🔢 {sheet_type}检测到数字列: {numeric_columns}")
+        print(f"🔢 检测到数字列: {numeric_columns} 在工作表: {worksheet.title}")
 
         # 设置标题行格式
         header_font = Font(name="Microsoft YaHei", bold=True, color=self.config["header_font_color"])
@@ -249,95 +323,12 @@ class JsonToExcelConverter:
 
         # 自动调整列宽和行高
         if self.config["auto_width"]:
-            self._auto_adjust_columns(worksheet, is_original_sheet)
+            self._auto_adjust_columns(worksheet)
 
         if self.config["wrap_text"]:
             self._apply_text_wrapping(worksheet, numeric_columns)
             
-    def _auto_adjust_columns(self, worksheet, is_original_sheet=False):
-        """自动调整列宽"""
-        for column in worksheet.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
 
-            for cell in column:
-                try:
-                    cell_value = str(cell.value) if cell.value is not None else ""
-
-                    # 处理换行符
-                    if "\n" in cell_value:
-                        lines = cell_value.split("\n")
-                        max_line_length = (
-                            max(len(line) for line in lines) if lines else 0
-                        )
-                        max_length = max(max_length, max_line_length)
-                    else:
-                        max_length = max(max_length, len(cell_value))
-                except Exception:
-                    pass
-
-            # 设置列宽范围
-            if is_original_sheet and column_letter == "B":
-                # 原始数据表的JSON列设置为最大宽度
-                adjusted_width = self.config["max_column_width"]
-            elif is_original_sheet and column_letter == "A":
-                # 索引列设置较小宽度
-                adjusted_width = 15
-            else:
-                # 根据列名长度设置最小列宽
-                header_length = len(
-                    str(worksheet.cell(row=1, column=column[0].column).value or "")
-                )
-                adjusted_width = min(
-                    max(
-                        max_length + 2,
-                        header_length + 2,
-                        self.config["min_column_width"],
-                    ),
-                    self.config["max_column_width"],
-                )
-
-            worksheet.column_dimensions[column_letter].width = adjusted_width
-
-    def _apply_text_wrapping(self, worksheet, numeric_columns=None):
-        """
-        应用文本换行（修改版本，考虑对齐方式）
-        
-        Args:
-            worksheet: openpyxl工作表对象
-            numeric_columns: 数字列集合
-        """
-        if numeric_columns is None:
-            numeric_columns = set()
-        
-        # 设置标题行高度为28.8
-        worksheet.row_dimensions[1].height = 28.8
-
-        # 应用标题行的自动换行（居中）
-        for cell in worksheet[1]:
-            cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
-
-        for row in worksheet.iter_rows(min_row=2):
-            max_lines = 1
-            for cell in row:
-                column_letter = cell.column_letter
-                
-                # 根据列类型设置换行对齐
-                if column_letter in numeric_columns:
-                    cell.alignment = Alignment(wrap_text=True, horizontal="center", vertical="center")
-                else:
-                    cell.alignment = Alignment(wrap_text=True, horizontal="left", vertical="center")
-
-                # 计算行高
-                if cell.value and "\n" in str(cell.value):
-                    lines_count = len(str(cell.value).split("\n"))
-                    max_lines = max(max_lines, lines_count)
-
-            # 设置行高
-            if max_lines > 1:
-                worksheet.row_dimensions[row[0].row].height = (
-                    max_lines * self.config["row_height_factor"]
-                )
 
     def convert_to_excel(
         self, data: List[Dict[str, Any]], output_path: str, verbose: bool = True
@@ -375,8 +366,8 @@ class JsonToExcelConverter:
             df_original = pd.DataFrame(
                 [
                     {
-                        self.sheet_config["index_column_name"]: i + 1,
-                        self.sheet_config["json_column_name"]: json.dumps(
+                        self.config["index_column_name"]: i + 1,
+                        self.config["json_column_name"]: json.dumps(
                             item, ensure_ascii=False, indent=2
                         ),
                     }
@@ -394,30 +385,32 @@ class JsonToExcelConverter:
                     print("📝 写入对比数据表...")
                 df_flat.to_excel(
                     writer,
-                    sheet_name=self.sheet_config["flattened_sheet_name"],
+                    sheet_name=self.config["processed_sheet_name"],
                     index=False,
                 )
 
-                # 写入原始数据
-                if verbose:
-                    print("📝 写入原始数据表...")
-                df_original.to_excel(
-                    writer,
-                    sheet_name=self.sheet_config["original_sheet_name"],
-                    index=False,
-                )
+                # 根据配置决定是否写入原始数据
+                if self.config.get("output_original_data", True):
+                    if verbose:
+                        print("📝 写入原始数据表...")
+                    df_original.to_excel(
+                        writer,
+                        sheet_name=self.config["original_sheet_name"],
+                        index=False,
+                    )
 
                 # 应用格式化
                 if verbose:
                     print("🎨 应用格式化...")
 
                 # 格式化对比数据表
-                flattened_ws = writer.sheets[self.sheet_config["flattened_sheet_name"]]
-                self._apply_excel_formatting(flattened_ws, False)
+                flattened_ws = writer.sheets[self.config["processed_sheet_name"]]
+                self._apply_excel_formatting(flattened_ws)
 
-                # 格式化原始数据表
-                original_ws = writer.sheets[self.sheet_config["original_sheet_name"]]
-                self._apply_excel_formatting(original_ws, True)
+                # 格式化原始数据表（如果存在）
+                if self.config.get("output_original_data", True):
+                    original_ws = writer.sheets[self.config["original_sheet_name"]]
+                    self._apply_excel_formatting(original_ws)
 
             if verbose:
                 print("✅ Excel文件创建成功!")
@@ -430,10 +423,13 @@ class JsonToExcelConverter:
                 "flattened_columns": len(df_flat.columns),
                 "column_names": list(df_flat.columns),
                 "sheets": [
-                    self.sheet_config["flattened_sheet_name"],
-                    self.sheet_config["original_sheet_name"],
+                    self.config["processed_sheet_name"],
                 ],
             }
+
+            # 如果输出原始数据表，则添加其名称
+            if self.config.get("output_original_data", True):
+                result["sheets"].append(self.config["original_sheet_name"])
 
             return result
 
@@ -460,3 +456,35 @@ class JsonToExcelConverter:
             data = [data]
         
         return self.convert_to_excel(data, output_path, **kwargs)
+
+    def merge_excel_files(self, excel_files, output_path):
+        """
+        合并多个Excel文件
+        """
+        # 创建一个Excel写入器
+        with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+            sheet_names_count = {}
+            for file in excel_files:
+                xls = pd.ExcelFile(file)
+                for sheet_name in xls.sheet_names:
+                    df = pd.read_excel(file, sheet_name=sheet_name)
+                    
+                    # 处理重复的sheet名称
+                    if sheet_name in sheet_names_count:
+                        sheet_names_count[sheet_name] += 1
+                        new_sheet_name = f"{sheet_name}_{sheet_names_count[sheet_name]}"
+                    else:
+                        sheet_names_count[sheet_name] = 1
+                        new_sheet_name = sheet_name
+                    
+                    df.to_excel(writer, sheet_name=new_sheet_name, index=False)  # 将每个sheet写入同一个Excel文件
+
+        # 读取合并后的Excel文件
+        with pd.ExcelWriter(output_path, engine="openpyxl", mode='a') as writer:
+            # 重新读取合并后的Excel文件以获取工作表
+            merged_workbook = writer.book
+            for sheet_name in merged_workbook.sheetnames:
+                worksheet = merged_workbook[sheet_name]
+                self._apply_excel_formatting(worksheet)  # 应用格式化
+
+        return output_path

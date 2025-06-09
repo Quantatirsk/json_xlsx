@@ -10,13 +10,14 @@ JSON转Excel转换器 - 简单易用的Python库
     result = converter.convert(data, "output.xlsx")
 """
 
-__version__ = "0.0.8"
+__version__ = "0.0.9"
 __author__ = "Quant"
 __email__ = "pengzhia@gmail.com"
 __description__ = "Convert nested JSON data to formatted Excel files"
 
 from .converter import JsonToExcelConverter
-from .config import CONVERTER_CONFIG, SHEET_CONFIG, VALIDATION_CONFIG
+from .config import CONVERTER_CONFIG, VALIDATION_CONFIG
+
 
 # 简化的API
 def convert_json_to_excel(data, output_path, config=None):
@@ -39,11 +40,18 @@ def convert_json_to_excel(data, output_path, config=None):
     
     return converter.convert_to_excel(data, output_path)
 
+def merge_sheets(excel_files, output_path):
+    """
+    合并多个Excel文件
+    """
+    converter = JsonToExcelConverter()
+    return converter.merge_excel_files(excel_files, output_path)
+
 # 导出主要组件
 __all__ = [
     "JsonToExcelConverter",
     "convert_json_to_excel",
+    "merge_sheets",
     "CONVERTER_CONFIG",
-    "SHEET_CONFIG", 
     "VALIDATION_CONFIG"
 ]

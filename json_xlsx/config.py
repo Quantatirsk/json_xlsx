@@ -14,14 +14,11 @@ CONVERTER_CONFIG = {
     'row_height_factor': 15,  # 行高系数
     'header_background_color': '005BAC',  # 表头背景色
     'header_font_color': 'FFFFFF',  # 表头字体颜色
-}
-
-# Excel工作表配置
-SHEET_CONFIG = {
-    'flattened_sheet_name': 'data',
-    'original_sheet_name': 'source',
-    'index_column_name': 'index',
-    'json_column_name': 'json',
+    'output_original_data': False, # 是否输出原始数据
+    'processed_sheet_name': 'data', # 扁平化数据表名
+    'original_sheet_name': 'source', # 原始数据表名
+    'index_column_name': 'index', # 索引列名
+    'json_column_name': 'json', # 原始数据列名
 }
 
 # 数据验证配置
