@@ -19,7 +19,7 @@
 ## 📦 安装
 
 ```bash
-pip install json_xlsx
+pip install json-xlsx
 ```
 
 ## 🚀 快速开始
@@ -220,7 +220,7 @@ python examples/basic_usage.py
 
 ## 📈 更新日志
 
-### v0.0.1
+### v0.0.2
 
 * 首次发布
 * 支持嵌套JSON扁平化

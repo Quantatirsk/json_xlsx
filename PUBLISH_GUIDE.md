@@ -92,8 +92,8 @@ python -m build
 
 这会在 `dist/` 目录下生成：
 
-* `json_xlsx-0.0.1.tar.gz` (源代码分发)
-* `json_xlsx-0.0.1-py3-none-any.whl` (轮子分发)
+* `json_xlsx-0.0.2.tar.gz` (源代码分发)
+* `json_xlsx-0.0.2-py3-none-any.whl` (轮子分发)
 
 ### 3. 检查构建结果
 
